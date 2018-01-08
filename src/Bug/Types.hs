@@ -46,10 +46,10 @@ mkGrid s = Grid s $ V.generate (sideLength*sideLength) (\x -> if distance (0,0) 
         sideLength = s*2 - 1
 
 bugs :: Grid -> ([Point], [Point])
-bugs (Grid s g) = V.ifoldl' foo (mempty,mempty) g
+bugs (Grid s g) = V.ifoldl' mkPs (mempty,mempty) g
     where
-        foo :: ([Point],[Point]) -> Int -> Word8 -> ([Point],[Point])
-        foo p i = \case
-            1 -> over _1 (\xs -> frmIdx s i:xs) p
-            2 -> over _2 (\xs -> frmIdx s i:xs) p
+        mkPs :: ([Point],[Point]) -> Int -> Word8 -> ([Point],[Point])
+        mkPs p i = \case
+            1 -> over _1 (frmIdx s i:) p
+            2 -> over _2 (frmIdx s i:) p
             _ -> p
