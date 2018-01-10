@@ -9,10 +9,16 @@ import Linear.V2
 import Diagrams.Prelude
 import Bug.Types
 import qualified Data.Vector.Unboxed as V
+import Data.Foldable
 
-foo (Grid s g) = position $ V.ifoldl' (\ps i -> \case
-                                      3 -> ps
-                                      pl -> ((coordToPoint (frmIdx s i),hex # fc (playerColor pl)):ps)) [] g
+bugDia = position . foldMap (\p -> [(coordToPoint p, hex)])
+
+gridDia (Grid s g) = position $ V.ifoldl' (\ps i -> maybe ps (:ps) . bar (frmIdx s i)) mempty g
+
+bar p = \case
+  3 -> Nothing
+  pl -> Just (coordToPoint p, hex # fc (playerColor pl))
+
 playerColor 0 = white
 playerColor 1 = lightgrey
 playerColor 2 = black

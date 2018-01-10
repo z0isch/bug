@@ -28,6 +28,7 @@ library
                      , diagrams-lib
                      , diagrams-contrib
                      , diagrams-svg
+                     , functor-classes-compat
   default-language:    Haskell2010
 
 executable bug-exe
@@ -36,6 +37,7 @@ executable bug-exe
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , bug
+                     , unordered-containers
                      , diagrams
                      , diagrams-lib
                      , diagrams-contrib
