@@ -17,9 +17,17 @@ library
   hs-source-dirs:      src
   ghc-options:         -Wall
   exposed-modules:     Bug.Types
+                     , Bug.Diagram
   build-depends:       base >= 4.7 && < 5
                      , lens
                      , vector
+                     , unordered-containers
+                     , linear
+                     , safe
+                     , diagrams
+                     , diagrams-lib
+                     , diagrams-contrib
+                     , diagrams-svg
   default-language:    Haskell2010
 
 executable bug-exe
@@ -28,6 +36,10 @@ executable bug-exe
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , bug
+                     , diagrams
+                     , diagrams-lib
+                     , diagrams-contrib
+                     , diagrams-svg
   default-language:    Haskell2010
 
 test-suite bug-test
