@@ -9,7 +9,6 @@ import Linear.V2
 import Diagrams.Prelude
 import Bug.Types
 import qualified Data.Vector.Unboxed as V
-import Data.Foldable
 
 bugDia = position . foldMap (\p -> [(coordToPoint p, hex)])
 
@@ -21,7 +20,7 @@ bar p = \case
 
 playerColor 0 = white
 playerColor 1 = lightgrey
-playerColor 2 = black
+playerColor 2 = darkslategray
 
 hex = regPoly 6 1 # rotateBy (1/12)
 
