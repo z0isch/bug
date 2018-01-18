@@ -1,13 +1,12 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module Bug.Types where
 
 import Data.Foldable
 import Control.Lens
-import Data.Vector.Unboxed ((!), (!?), Vector)
+import Data.Vector.Unboxed ((!?), Vector)
 import qualified Data.Vector.Unboxed as V
 import Data.Word
 import Linear.V2
@@ -15,6 +14,8 @@ import Linear.Vector
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as H
 import Data.Monoid
+import Data.Semigroup
+import Data.Graph (Graph)
 import qualified Data.Graph as G
 import qualified Data.Tree as T
 import Data.Maybe
@@ -28,12 +29,9 @@ type GridSize = Int
 
 type Bug = HashSet BPoint
 
-data Player = P1 | P2
-    deriving (Eq, Show)
-
 data Grid = Grid 
-    { _gSize :: GridSize
-    , _grid :: Vector Word8
+    { _gSize :: !GridSize
+    , _grid :: !(Vector Word8)
     }
     deriving (Eq, Show)
 makeLenses ''Grid
@@ -47,15 +45,6 @@ frmIdx s i = let (d,m) = i `divMod` (s*2 - 1) in V2 (d - (s-1)) (m - (s-1))
 idx :: GridSize -> BPoint -> GPoint
 idx s (V2 x y) = ((x + (s-1)) * (s*2 - 1)) + (y + (s-1))
 
-piece :: Grid -> BPoint -> Maybe (Maybe Player)
-piece (Grid s g) p = case x of
-    0 -> Just Nothing
-    1 -> Just $ Just P1
-    2 -> Just $ Just P2
-    _ -> Nothing
-    where i = idx s p 
-          x = g ! i
-
 neighbors :: BPoint -> [BPoint]
 neighbors (V2 x z) = [V2 (x+1) z, V2 (x+1) (z-1), V2 x (z-1), V2 (x-1) z, V2 (x-1) (z-1), V2 x (z+1)]
 
@@ -63,22 +52,32 @@ isNeighbor :: BPoint -> BPoint -> Bool
 isNeighbor p = (1 ==) . distance p
 
 distance :: BPoint -> BPoint -> Int
-distance (V2 q r) (V2 q' r') = maximum $ map abs [q-q',r-r',q + r - q' - r']
+distance (V2 q r) (V2 q' r') = getMax $ foldMap (Max . abs) [q-q',r-r',q + r - q' - r']
 
 mkGrid :: GridSize -> Grid
 mkGrid s = Grid s $ V.generate (sideLength*sideLength) mkPiece
     where
-        mkPiece x = if distance (V2 0 0) (frmIdx s x) <= (s-1) then 0 else 3
+        mkPiece x 
+            | distance (V2 0 0) (frmIdx s x) <= (s-1) = 0 
+            | otherwise =  3
         sideLength = s*2 - 1
 
 bugs :: Grid -> (HashSet Bug, HashSet Bug)
-bugs (Grid s g) = (forPl 1, forPl 2)
+bugs gr@(Grid s g) = (forPl 1, forPl 2)
     where
         forPl x = H.fromList $ map (H.fromList . map (frmIdx s)) $ filter (maybe False (\c -> g !? c == Just x) . headMay) cs
-        cs = map T.flatten $ G.components $ G.buildG (0,V.length g) $ V.ifoldl' mkEdges [] g
-        mkEdges :: [G.Edge] -> GPoint -> Word8 -> [G.Edge]
-        mkEdges es i pl = mapMaybe (\n -> g !? idx s n >>= \i' -> if i' /= pl then Nothing else Just (i,idx s n)) (neighbors (frmIdx s i)) ++ es
-        
+        cs = map T.flatten $ G.components $ gridGraph gr
+
+gridGraph :: Grid -> Graph
+gridGraph (Grid s g) = G.buildG (0,V.length g - 1) edges
+    where 
+        edges = V.ifoldl' mkEdges [] g
+        mkEdges es i pl = es ++ mapMaybe mkEdge (neighbors (frmIdx s i))
+            where mkEdge n = let i2 = idx s n 
+                             in do
+                                pl2 <- g !? i2
+                                if pl2 == pl then Just (i, i2) else Nothing
+
 canEat :: Bug -> Bug -> Bool
 canEat b1 b2 = isAdjacentBug b1 b2 && isIsomorphicBug b1 b2
 
@@ -100,10 +99,10 @@ rotations = take 6 . iterate (rotate60 (V2 0 0))
 
 reflect :: Bug -> Bug
 reflect = H.map f
-    where f (V2 x z) = V2 x' z'
-            where y = -z - x
-                  x' = y
-                  z' = z
+    where f (V2 x z) = let y = -z - x
+                           x' = y
+                           z' = z
+                       in V2 x' z'
 
 centerPoint :: Bug -> BPoint
 centerPoint = minimumBy (\(V2 q r) (V2 q' r') -> if q > q' then GT else if q < q' then LT else compare r r')
