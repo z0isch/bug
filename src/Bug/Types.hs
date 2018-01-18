@@ -7,7 +7,7 @@ module Bug.Types where
 
 import Data.Foldable
 import Control.Lens
-import Data.Vector.Unboxed ((!), Vector)
+import Data.Vector.Unboxed ((!), (!?), Vector)
 import qualified Data.Vector.Unboxed as V
 import Data.Word
 import Linear.V2
@@ -15,6 +15,10 @@ import Linear.Vector
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as H
 import Data.Monoid
+import qualified Data.Graph as G
+import qualified Data.Tree as T
+import Data.Maybe
+import Safe
 
 type BPoint = V2 Int
 
@@ -52,6 +56,9 @@ piece (Grid s g) p = case x of
     where i = idx s p 
           x = g ! i
 
+neighbors :: BPoint -> [BPoint]
+neighbors (V2 x z) = [V2 (x+1) z, V2 (x+1) (z-1), V2 x (z-1), V2 (x-1) z, V2 (x-1) (z-1), V2 x (z+1)]
+
 isNeighbor :: BPoint -> BPoint -> Bool
 isNeighbor p = (1 ==) . distance p
 
@@ -65,18 +72,12 @@ mkGrid s = Grid s $ V.generate (sideLength*sideLength) mkPiece
         sideLength = s*2 - 1
 
 bugs :: Grid -> (HashSet Bug, HashSet Bug)
-bugs (Grid s g) = V.ifoldl' mkPs (mempty,mempty) g
+bugs (Grid s g) = (forPl 1, forPl 2)
     where
-        mkPs p i = \case
-            1 -> over _1 (insertIt i) p
-            2 -> over _2 (insertIt i) p
-            _ -> p
-        insertIt i = smash . H.insert (H.singleton (frmIdx s i))
-        smash = foldr addEl mempty
-        addEl p ps
-            | H.size adjacents == 0 = H.insert p ps
-            | otherwise = foldr (\b' ps' -> H.insert (H.union b' p) $ H.delete b' ps') ps adjacents
-            where adjacents = H.filter (isAdjacentBug p) ps
+        forPl x = H.fromList $ map (H.fromList . map (frmIdx s)) $ filter (maybe False (\c -> g !? c == Just x) . headMay) cs
+        cs = map T.flatten $ G.components $ G.buildG (0,V.length g) $ V.ifoldl' mkEdges [] g
+        mkEdges :: [G.Edge] -> GPoint -> Word8 -> [G.Edge]
+        mkEdges es i pl = mapMaybe (\n -> g !? idx s n >>= \i' -> if i' /= pl then Nothing else Just (i,idx s n)) (neighbors (frmIdx s i)) ++ es
         
 canEat :: Bug -> Bug -> Bool
 canEat b1 b2 = isAdjacentBug b1 b2 && isIsomorphicBug b1 b2

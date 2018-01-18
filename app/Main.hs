@@ -11,14 +11,14 @@ import Bug.Types
 import qualified Data.HashSet as H
 
 d :: Diagram B
-d = gridDia testGrid
+d = gridDia testGrid2
 
 t :: Diagram B
 t = d 
   ||| 
-  (   foldMap (foldl (\p b -> p ||| (b # showEnvelope # showOrigin)) mempty . map bugDia) (H.map perms $ fst $ bugs testGrid)
-  === foldMap (foldl (\p b -> p ||| (b # showEnvelope # showOrigin)) mempty . map bugDia) (H.map perms $ snd $ bugs testGrid)
+  (   foldMap (foldl (\p b -> p ||| (b # showEnvelope # showOrigin)) mempty . map bugDia) (H.map perms $ fst $ bugs testGrid2)
+  === foldMap (foldl (\p b -> p ||| (b # showEnvelope # showOrigin)) mempty . map bugDia) (H.map perms $ snd $ bugs testGrid2)
   )
-    
+
 main :: IO ()
-main = renderSVG "out.svg" (dims (V2 300 300)) t
+main = renderSVG "out.svg" (dims (V2 600 600)) t
