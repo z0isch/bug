@@ -15,8 +15,10 @@ d = gridDia testGrid
 
 t :: Diagram B
 t = d 
-  ||| (foldMap (foldl (\t b -> t ||| (b # showEnvelope # showOrigin)) mempty . map bugDia) (H.map perms $ fst $ bugs testGrid)
-  === foldMap (foldl (\t b -> t ||| (b # showEnvelope # showOrigin)) mempty . map bugDia) (H.map perms $ snd $ bugs testGrid))
+  ||| 
+  (   foldMap (foldl (\p b -> p ||| (b # showEnvelope # showOrigin)) mempty . map bugDia) (H.map perms $ fst $ bugs testGrid)
+  === foldMap (foldl (\p b -> p ||| (b # showEnvelope # showOrigin)) mempty . map bugDia) (H.map perms $ snd $ bugs testGrid)
+  )
     
 main :: IO ()
 main = renderSVG "out.svg" (dims (V2 300 300)) t

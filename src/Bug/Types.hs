@@ -14,10 +14,11 @@ import Linear.V2
 import Linear.Vector
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as H
-import Safe
 import Data.Monoid
 
 type BPoint = V2 Int
+
+type GPoint = Int
 
 type GridSize = Int
 
@@ -33,21 +34,21 @@ data Grid = Grid
     deriving (Eq, Show)
 makeLenses ''Grid
 
-toBPoint :: GridSize -> Iso' Int BPoint
+toBPoint :: GridSize -> Iso' GPoint BPoint
 toBPoint s = iso (frmIdx s) (idx s)
 
-frmIdx :: GridSize -> Int -> BPoint
+frmIdx :: GridSize -> GPoint -> BPoint
 frmIdx s i = let (d,m) = i `divMod` (s*2 - 1) in V2 (d - (s-1)) (m - (s-1))
 
-idx :: GridSize -> BPoint -> Int
+idx :: GridSize -> BPoint -> GPoint
 idx s (V2 x y) = ((x + (s-1)) * (s*2 - 1)) + (y + (s-1))
 
-piece :: Grid -> BPoint -> Either () (Maybe Player)
+piece :: Grid -> BPoint -> Maybe (Maybe Player)
 piece (Grid s g) p = case x of
-    0 -> Right Nothing
-    1 -> Right $ Just P1
-    2 -> Right $ Just P2
-    _ -> Left ()
+    0 -> Just Nothing
+    1 -> Just $ Just P1
+    2 -> Just $ Just P2
+    _ -> Nothing
     where i = idx s p 
           x = g ! i
 
@@ -71,9 +72,11 @@ bugs (Grid s g) = V.ifoldl' mkPs (mempty,mempty) g
             2 -> over _2 (insertIt i) p
             _ -> p
         insertIt i = smash . H.insert (H.singleton (frmIdx s i))
-        smash = foldl' addEl mempty
-        addEl ps p = maybe (H.insert p ps) (\b' -> H.insert (H.union b' p) $ H.delete b' ps) b
-            where b = headMay $ toList $ H.filter (isAdjacentBug p) ps
+        smash = foldr addEl mempty
+        addEl p ps
+            | H.size adjacents == 0 = H.insert p ps
+            | otherwise = foldr (\b' ps' -> H.insert (H.union b' p) $ H.delete b' ps') ps adjacents
+            where adjacents = H.filter (isAdjacentBug p) ps
         
 canEat :: Bug -> Bug -> Bool
 canEat b1 b2 = isAdjacentBug b1 b2 && isIsomorphicBug b1 b2
@@ -89,7 +92,7 @@ isIsomorphicBug b1 b2
         sameSize = H.size b1 == H.size b2
 
 perms :: Bug -> [Bug]
-perms b = map cannonicalBug $ (concatMap (\rot ->  [rot,reflect rot]) . rotations) b
+perms = map cannonicalBug . concatMap (\rot ->  [rot,reflect rot]) . rotations
 
 rotations :: Bug -> [Bug]
 rotations = take 6 . iterate (rotate60 (V2 0 0))
