@@ -92,7 +92,7 @@ isIsomorphicBug b1 b2
         sameSize = H.size b1 == H.size b2
 
 perms :: Bug -> [Bug]
-perms = map cannonicalBug . concatMap (\rot ->  [rot,reflect rot]) . rotations
+perms = concatMap (map cannonicalBug . \rot ->  [rot,reflect rot]) . rotations
 
 rotations :: Bug -> [Bug]
 rotations = take 6 . iterate (rotate60 (V2 0 0))
