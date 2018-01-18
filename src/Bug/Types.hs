@@ -52,7 +52,7 @@ isNeighbor :: BPoint -> BPoint -> Bool
 isNeighbor p = (1 ==) . distance p
 
 distance :: BPoint -> BPoint -> Int
-distance (V2 q r) (V2 q' r') = getMax $ foldMap (Max . abs) [q-q',r-r',q + r - q' - r']
+distance (V2 q r) (V2 q' r') = maximum $ map abs [q-q',r-r',q + r - q' - r']
 
 mkGrid :: GridSize -> Grid
 mkGrid s = Grid s $ V.generate (sideLength*sideLength) mkPiece
