@@ -6,7 +6,7 @@ module Bug.Types where
 
 import Data.Foldable
 import Control.Lens
-import Data.Vector.Unboxed ((!?), Vector)
+import Data.Vector.Unboxed ((!?), Vector, (//))
 import qualified Data.Vector.Unboxed as V
 import Data.Word
 import Linear.V2
@@ -14,7 +14,6 @@ import Linear.Vector
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as H
 import Data.Monoid
-import Data.Semigroup
 import Data.Graph (Graph)
 import qualified Data.Graph as G
 import qualified Data.Tree as T
@@ -29,12 +28,24 @@ type GridSize = Int
 
 type Bug = HashSet BPoint
 
+type Move = [BPoint]
+
+type Player = Word8
+
 data Grid = Grid 
     { _gSize :: !GridSize
     , _grid :: !(Vector Word8)
     }
     deriving (Eq, Show)
 makeLenses ''Grid
+
+data BugState = BugState 
+    { _bsGrid :: !Grid
+    , _bsGraph :: !Graph
+    , _bsMoves :: ![Move]
+    }
+    deriving (Eq, Show)
+makeLenses ''BugState
 
 toBPoint :: GridSize -> Iso' GPoint BPoint
 toBPoint s = iso (frmIdx s) (idx s)
@@ -53,6 +64,27 @@ isNeighbor p = (1 ==) . distance p
 
 distance :: BPoint -> BPoint -> Int
 distance (V2 q r) (V2 q' r') = maximum $ map abs [q-q',r-r',q + r - q' - r']
+
+initialState :: GridSize -> BugState
+initialState s = BugState {_bsGrid = _bsGrid, _bsGraph= gridGraph _bsGrid, _bsMoves= []  }
+    where _bsGrid = mkGrid s
+
+mkMove :: BugState -> Move -> BugState
+mkMove bs [] = bs
+mkMove bs mv@(m:ms)
+    | null (bs^.bsMoves) = addToGraph $ addMove $ addToGrid bs
+    | otherwise = addMove bs
+    where 
+        currPlayer = if length (bs^.bsMoves) `mod` 2 == 0 then 1 else 2
+        addMove = over bsMoves ((:) mv)
+        addToGrid = over (bsGrid.grid) (\v ->V.update v (V.fromList [(idx (bs^.bsGrid.gSize) m, currPlayer)]))
+        addToGraph = over bsGraph addNeighbors
+        i = idx (bs^.bsGrid.gSize) m        
+        addNeighbors g = G.buildG (0,V.length (bs^.bsGrid.grid) - 1) $ G.edges g ++ mapMaybe mkEdge (neighbors m)
+        mkEdge n = let i2 = idx (bs^.bsGrid.gSize) n
+                   in do
+                    pl <- (bs^.bsGrid.grid) !? i2
+                    if pl == currPlayer then Just (i, i2) else Nothing
 
 mkGrid :: GridSize -> Grid
 mkGrid s = Grid s $ V.generate (sideLength*sideLength) mkPiece
@@ -77,6 +109,16 @@ gridGraph (Grid s g) = G.buildG (0,V.length g - 1) edges
                              in do
                                 pl2 <- g !? i2
                                 if pl2 == pl then Just (i, i2) else Nothing
+
+eat :: Player -> Grid -> ([Bug],Grid)
+eat pl gr@(Grid s g) =(map fst bugPairs, over grid (// gridUpdates) gr)
+    where
+        gridUpdates = foldMap (bugUpdate . snd) bugPairs
+        bugUpdate = foldMap (\b -> [(idx s b,0)])
+        otherPl = if pl == 1 then 2 else 1
+        bugPairs = [(x,y) | x <- forPl pl, y <- forPl otherPl, canEat x y]
+        forPl x = map (H.fromList . map (frmIdx s)) $ filter (maybe False (\c -> g !? c == Just x) . headMay) cs
+        cs = map T.flatten $ G.components $ gridGraph gr
 
 canEat :: Bug -> Bug -> Bool
 canEat b1 b2 = isAdjacentBug b1 b2 && isIsomorphicBug b1 b2
@@ -123,4 +165,9 @@ testGrid = setToPlayer 2 [V2 0 (-1),V2 (-2) 0,V2 1 (-2), V2 (-1) 0,V2 0 (-2), V2
 testGrid2 :: Grid
 testGrid2 = setToPlayer 2 [V2 0 (-1),V2 (-2) 0,V2 1 (-2), V2 (-1) 0,V2 0 (-2), V2 (-2) 1] 
         $ setToPlayer 1 [V2 (-2) 2, V2 (-1) 1,V2 0 1, V2 2 (-1),V2 1 (-1), V2 0 0] 
+        $ mkGrid 3
+
+testGrid3 :: Grid
+testGrid3 = setToPlayer 2 [V2 0 0, V2 1 0, V2 (-2) 2, V2 (-1) 2] 
+        $ setToPlayer 1 [V2 0 1, V2 0 2] 
         $ mkGrid 3
